@@ -15,9 +15,17 @@ export function TransactionsTable() {
 
   const editRef = useRef<any>(null);
   const detailsRef = useRef<typeof TransactionDetailsHandle>(null);
+
   useEffect(() => {
-    const unsub = onAllTransactions(setTransactions);
-    return () => unsub();
+    let unsub: (() => void) | undefined;
+
+    unsub = onAllTransactions(setTransactions).then((unsubscribe) => {
+      unsub = unsubscribe;
+    });
+
+    return () => {
+      if (unsub) unsub();
+    };
   }, []);
 
   function openView(t: typeof Transaction) {
