@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { RiArrowRightDownLine, RiArrowRightUpLine } from "react-icons/ri";
 import { transactions as transactionServices, models } from '@grupo21/shared-react'
 import TransactionTableActionButtons from "./transaction-table-action-buttons";
 import TransactionDetailsModal from "./transaction-table-details-modal";
 import TransactionTableEditModal from "./transaction-table-edit-modal";
+import { useAppSelector } from "../../store/hooks";
 
 export function TransactionsTable() {
-  const { onAllTransactions, deleteTransaction } = transactionServices
+  const { onTransationsByMonth, deleteTransaction } = transactionServices
+  const { period, type, category, search } = useAppSelector((s) => s.filters);
 
   const { transactionTypes, TransactionDetailsHandle } = models
   const { Transaction } = transactionTypes
@@ -19,14 +21,14 @@ export function TransactionsTable() {
   useEffect(() => {
     let unsub: (() => void) | undefined;
 
-    unsub = onAllTransactions(setTransactions).then((unsubscribe) => {
+    unsub = onTransationsByMonth(period.year, period.month, setTransactions).then((unsubscribe) => {
       unsub = unsubscribe;
     });
 
     return () => {
       if (unsub) unsub();
     };
-  }, []);
+  }, [period.year, period.month]);
 
   function openView(t: typeof Transaction) {
     detailsRef.current?.open(t);
@@ -50,6 +52,25 @@ export function TransactionsTable() {
     style: "currency",
     currency: "BRL",
   });
+
+  const isIncome = (t: typeof models.Transaction) => t.type === "deposito";
+  const isOutflow = (t: typeof models.Transaction) =>
+    t.type === "saque" || t.type === "transferencia";
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+
+    return transactions.filter((t) => {
+      const okType = type === "all" ? true : t.type === type;
+      const okCat = category === "all" ? true : t.category === category;
+
+      const okSearch = !q
+        ? true
+        : (t.description ?? "").toLowerCase().includes(q);
+
+      return okType && okCat && okSearch;
+    });
+  }, [transactions, type, category, search]);
 
   type TransactionRowProp = {
     t: typeof Transaction;
@@ -93,7 +114,7 @@ export function TransactionsTable() {
 
           <div className="mt-1">
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
-              {t?.category}
+              {t?.type}
             </span>
           </div>
         </div>
@@ -115,7 +136,7 @@ export function TransactionsTable() {
       <h2 className="text-lg font-semibold">
         Lista de Transações
       </h2>
-      {transactions.length === 0 ? (
+      {filtered.length === 0 ? (
         <p>(sem transações)</p>
       ) : (
         <div className="overflow-x-auto">
@@ -138,7 +159,7 @@ export function TransactionsTable() {
               </tr>
             </thead>
             <tbody>
-              {transactions.map((t) => {
+              {filtered.map((t) => {
                 const textColor =
                   t.type === "saque"
                     ? "text-red-500"
@@ -197,8 +218,8 @@ export function TransactionsTable() {
                               key={col.key}
                               className={`px-4 py-2 text-right ${textColor}`}
                             >
-                              {t.type === "deposito" ? "+ " : "- "}
-                              {nfBRL.format(t.value)}
+                              {isIncome(t) ? "+ " : "- "}
+                              {nfBRL.format(Math.abs(t.value))}
                             </td>
                           );
                         case "actions":
@@ -238,18 +259,6 @@ export function TransactionsTable() {
         handleEditedSaved={handleEditedSaved}
         editRef={editRef}
       />
-
-      {/* <Modal ref={editRef} title="Editar Transação">
-        {editing ? (
-          <TransactionForm
-            initial={editing}
-            onSaved={handleEditedSaved}
-            onCancel={() => editRef.current?.close()}
-          />
-        ) : (
-          <p>Nenhuma transação selecionada.</p>
-        )}
-      </Modal> */}
     </section>
   );
 }
