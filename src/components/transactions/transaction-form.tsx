@@ -7,7 +7,7 @@ import FormField from "../ui/form-field";
 
 type Props = {
   initial?: typeof models.Transaction | null;
-  onSaved?: () => void;
+  onSaved?: (saved: any) => void;
   onCancel?: () => void;
 };
 
@@ -132,7 +132,13 @@ export default function TransactionForm({ initial, onSaved, onCancel }: Props) {
           date: new Date(dateStr),
         });
       }
-      onSaved?.();
+      onSaved?.({
+        type,
+        category,
+        description,
+        value,
+        date: new Date(dateStr),
+      });
     } catch (err: any) {
       setError(err?.message ?? "Não foi possível salvar a transação.");
     } finally {
